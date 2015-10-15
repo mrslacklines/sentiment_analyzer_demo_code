@@ -1,0 +1,5 @@
+Obtaining Twitter OAuth:
+
+curl -u Hzg3U5TT8ZBP5vQf5zwMs5sTA:M58LEWeNob8I5ZZZ3wL60n6VJ2UXCl8XxlFMuFRWwMXMraVkFR -d grant_type=client_credentials https://api.twitter.com/oauth2/token
+
+{"token_type":"bearer","access_token":"AAAAAAAAAAAAAAAAAAAAAHy7ggAAAAAAu2zX2g5RvAmpikRp1zpOwxPkxXM%3DSAcyPAROisyNJ7HKRB4tQRH0egnN47Avce5bNcTha73R36wGfG"}
