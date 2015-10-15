@@ -1,2 +1,3 @@
+pyOpenSSL
 nltk==3.0.4
 tweepy==3.3.0
