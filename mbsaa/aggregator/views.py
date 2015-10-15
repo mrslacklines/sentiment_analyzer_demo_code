@@ -92,7 +92,7 @@ class Aggregator(StreamListener):
         timestamp = flat_limits.get('resources:search:/search/tweets:reset')
         return timestamp
 
-    def _get_twitter_posts_by_stream(self, stream, keyword):
+    def _get_twitter_posts_by_stream(self, keyword):
         """
         TODO
         """
