@@ -1,0 +1,8 @@
+mbsaa:
+ build: .
+ ports:
+  - "8000:8000"
+ links:
+  - redis
+redis:
+ image: redis

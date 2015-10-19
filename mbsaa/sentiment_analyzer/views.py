@@ -42,6 +42,8 @@ import re
 
 from collections import OrderedDict
 
+from nltk import NaiveBayesClassifier
+
 __author__ = "Christopher Potts"
 __copyright__ = "Copyright 2011, Christopher Potts"
 __credits__ = []
@@ -238,4 +240,15 @@ class FeatureExtractor:
                 train.append([row[tweet_col], row[sentiment_col]])
         return train
 
-    def prepare_training_set(self)
+
+def main():
+    """
+    TODO
+    """
+    ff = FeatureExtractor()
+    train_data = ff.read_train_corpus('full-corpus.csv', 4, 1)
+    training_dataset = [(ff.get_word_feats(ff.tokenize(t[0])), t[1])
+                        for t in train_data
+                        if t[1] not in ('neutral', 'irrelevant')]
+    nb = NaiveBayesClassifier.train(training_dataset)
+    nb.show_most_informative_features(10)
