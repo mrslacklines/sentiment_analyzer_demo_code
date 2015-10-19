@@ -5,11 +5,13 @@ Twitter stream listener
 Aggregates tweets for a given set of keywords
 """
 
-from __future__ import unicode_literals
-
 import argparse
+import re
 import sys
 from flatdict import FlatDict
+from itertools import product
+from redis import Redis
+from requests import ConnectionError
 from tweepy import (
     API, OAuthHandler, Stream, StreamListener, TweepError)
 from yaml import safe_load
@@ -23,8 +25,8 @@ class Aggregator(StreamListener):
 
     def __init__(self, config_file_handle):
         self.configuration = self._read_config(config_file_handle)
-        self.counter = 0
         self.api = self.api or self._set_twitter_rest_api()
+        self.redis = Redis(host='redis')
 
     def on_error(self, status_code):
         print status_code
@@ -33,8 +35,14 @@ class Aggregator(StreamListener):
         self.counter = 0
 
     def on_status(self, status):
-        self.counter += 1
-        print str(self.counter) + ' ' + status.text
+        for word in re.sub(r'#', r'', status.text).lower().split():
+            if word.lower() in self.configuration.get(
+                    'TWITTER', {}). get('CITIES'):
+                self.redis.lpush(
+                    word.lower(), {
+                        'ts': status.timestamp_ms,
+                        'text': status.text,
+                        'location': status.place})
 
     def _read_config(self, filehandle):
         return safe_load(filehandle)
@@ -111,17 +119,18 @@ class Aggregator(StreamListener):
         timestamp = flat_limits.get('resources:search:/search/tweets:reset')
         return timestamp
 
-    def get_twitter_posts_by_stream(self, keyword):
+    def get_twitter_posts_by_stream(self):
         """
         Collects tweets for a given set of keywords
         """
+        keyword_hashtag_pairs = product(
+            self.configuration.get('TWITTER', {}).get('HASHTAGS'),
+            self.configuration.get('TWITTER', {}).get('CITIES'))
+        filter_params = ['#' + kh_pair[0] + ' ' + kh_pair[1]
+                         for kh_pair in keyword_hashtag_pairs]
         stream = self._set_twitter_stream_api()
-        filter_params = ['#' + hashtag + ' ' + keyword for hashtag
-                         in self.configuration.get(
-                             'TWITTER', {}).get('HASHTAGS')]
-        # print filter_params
         stream.filter(
-            track=filter_params, async=True, languages=self.configuration.get(
+            track=filter_params, async=False, languages=self.configuration.get(
                 'OAUTH', {}).get('LANGUAGES'))
         return stream
 
@@ -135,15 +144,8 @@ def main(arguments):
         'config', help="Config file", type=argparse.FileType('r'))
 
     args = parser.parse_args(arguments)
-    while True:
-        try:
-            aggregator = Aggregator(args.config)
-            aggregator.get_twitter_posts_by_stream('boston')
-
-        except Exception, e:
-            print "Error. Restarting Stream.... Error: "
-            print e.__doc__
-            print e.message
+    aggregator = Aggregator(args.config)
+    stream = aggregator.get_twitter_posts_by_stream()
 
 
 if __name__ == '__main__':
