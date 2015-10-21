@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import re
 import scrapy
 
 
@@ -24,8 +25,39 @@ class TripAdvisorSpider(scrapy.Spider):
             yield request
 
     def parse_search_results(self, response):
-        location_results = response.css('.GEOS')
-        results = [res for res in location_results.extract()
-                   if response.meta['city_name'] in res.lower()]
-        for result in results:
-            pass
+        location_results = response.css('.result.GEOS')
+        city_frontpage_url = re.findall(
+            r'([^/]+\/[^.]+\.html)',
+            location_results.xpath('.//@onclick').extract_first())
+        if city_frontpage_url:
+            url = response.urljoin(city_frontpage_url[0])
+            request = scrapy.Request(
+                url, callback=self.parse_city_frontpage)
+            request.meta['city_name'] = response.meta['city_name']
+            yield request
+        for result in location_results:
+            if response.meta['city_name'] not in result.extract().lower():
+                continue
+            links = result.xpath('.//a/@href').extract()
+            for link in links:
+                url = response.urljoin(link)
+                request = scrapy.Request(url, callback=self.parse_review_type)
+                request.meta['city_name'] = response.meta['city_name']
+                yield request
+
+    def parse_review_type(self, response):
+        pass
+
+    def parse_city_frontpage(self, response):
+        forum_url = response.xpath(
+            "//a[@data-trk='forum_nav']/@href").extract_first()
+        if "forum" not in forum_url.lower():
+            return
+        url = response.urljoin(forum_url)
+        request = scrapy.Request(url, callback=self.parse_forum)
+        request.meta['city_name'] = response.meta['city_name']
+        yield request
+
+    def parse_forum(self, response):
+        import ipdb; ipdb.set_trace()  # breakpoint fe0c7feb //
+        pass
