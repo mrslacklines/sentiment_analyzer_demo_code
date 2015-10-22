@@ -3,6 +3,10 @@
 import re
 import scrapy
 
+from datetime import datetime, timedelta
+
+from tripadvisor.items import TripadvisorItem
+
 
 cities = ['new york city', 'chicago', 'boston']
 
@@ -59,5 +63,31 @@ class TripAdvisorSpider(scrapy.Spider):
         yield request
 
     def parse_forum(self, response):
-        import ipdb; ipdb.set_trace()  # breakpoint fe0c7feb //
+        for row in response.xpath('//table/tr'):
+            if row.xpath('./td/@class').extract_first() == 'tHead':
+                continue
+            date_col = row.xpath('./td').css('.datecol')
+            topic_url = date_col.xpath('./a/@href').extract_first()
+            url = response.urljoin(topic_url)
+            request = scrapy.Request(url, callback=self.parse_forum_thread)
+            request.meta['city_name'] = response.meta['city_name']
+            yield request
+            # date_str = date_col.xpath('./text()').extract_first()
+            # if not date_str:
+            #     continue
+            # if re.match(r'\d{1,2}:\d{1,2}(\s[ap]m)?', date_str):
+            #     date = datetime.today()
+            # elif date_str == 'yesterday':
+            #     date = datetime.today - timedelta(1)
+            # else:
+            #     date = datetime.strptime(date_str, '%b %d, %Y')
+
+    def parse_forum_thread(self, response):
         pass
+
+    def parse_forum_thread_page(self, response):
+        for post in response.css('.postcontent'):
+            paragraphs = post.css('.postBody').extract()
+            post_text = ' '.join(paragraphs)
+            post_date_str = post.css('.postDate').xpath('.//text()').extract()
+            post_date = datetime.strptime(post_date_str, '%b %d, %Y')
