@@ -4,6 +4,7 @@ import re
 import scrapy
 
 from datetime import datetime, timedelta
+from redis import Redis
 
 from tripadvisor.items import TripadvisorItem
 
@@ -17,6 +18,9 @@ class TripAdvisorSpider(scrapy.Spider):
     start_urls = [
         "http://www.tripadvisor.com",
     ]
+
+    def __init__(self):
+        self.redis = Redis(host='redis')
 
     def parse(self, response):
         for city_name in cities:
@@ -58,36 +62,53 @@ class TripAdvisorSpider(scrapy.Spider):
         if "forum" not in forum_url.lower():
             return
         url = response.urljoin(forum_url)
-        request = scrapy.Request(url, callback=self.parse_forum)
+        request = scrapy.Request(
+            url, callback=self.process_forum_pagination)
         request.meta['city_name'] = response.meta['city_name']
         yield request
+
+    def process_forum_pagination(self, response):
+        for thread in self.parse_forum(response):
+            yield thread
+        next_url = response.css(".guiArw.sprite-pageNext").xpath(
+            './/@href').extract_first()
+        if next_url:
+            url = response.urljoin(next_url)
+            request = scrapy.Request(
+                url, callback=self.process_forum_pagination)
+            request.meta['city_name'] = response.meta['city_name']
+            yield request
 
     def parse_forum(self, response):
         for row in response.xpath('//table/tr'):
             if row.xpath('./td/@class').extract_first() == 'tHead':
                 continue
-            date_col = row.xpath('./td').css('.datecol')
-            topic_url = date_col.xpath('./a/@href').extract_first()
+            topic_url = row.xpath("./td/b/a/@href").extract_first()
             url = response.urljoin(topic_url)
             request = scrapy.Request(url, callback=self.parse_forum_thread)
             request.meta['city_name'] = response.meta['city_name']
             yield request
-            # date_str = date_col.xpath('./text()').extract_first()
-            # if not date_str:
-            #     continue
-            # if re.match(r'\d{1,2}:\d{1,2}(\s[ap]m)?', date_str):
-            #     date = datetime.today()
-            # elif date_str == 'yesterday':
-            #     date = datetime.today - timedelta(1)
-            # else:
-            #     date = datetime.strptime(date_str, '%b %d, %Y')
 
     def parse_forum_thread(self, response):
-        pass
+        self.parse_forum_thread_page(response)
+        css_selector = ".pagination > #pager_top2 > .guiArw.sprite-pageNext"
+        next_url = response.css(css_selector).extract_first()
+        if next_url:
+            url = response.urljoin(next_url)
+            request = scrapy.Request(
+                url, callback=self.parse_forum_thread)
+            request.meta['city_name'] = response.meta['city_name']
+            yield request
+
+    def _clean_post_text(self, post_text)
+        post_text = re.sub('<[^>]+>', '', post_text)
+        post_text = re.sub('\\n' '', post_text)
+        return post_text
 
     def parse_forum_thread_page(self, response):
         for post in response.css('.postcontent'):
             paragraphs = post.css('.postBody').extract()
-            post_text = ' '.join(paragraphs)
-            post_date_str = post.css('.postDate').xpath('.//text()').extract()
-            post_date = datetime.strptime(post_date_str, '%b %d, %Y')
+            post_text = self._clean_post_text(' '.join(paragraphs))
+            post_date_str = post.css('.postDate').xpath('.//text()').extract_first()
+            post_date = datetime.strptime(post_date_str, '%b %d, %Y, %I:%M %p')
+            import ipdb; ipdb.set_trace()  # breakpoint 1fc0e6d3 //

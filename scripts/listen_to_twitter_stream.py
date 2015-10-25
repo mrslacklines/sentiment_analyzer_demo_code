@@ -8,6 +8,7 @@ Aggregates tweets for a given set of keywords
 import argparse
 import re
 import sys
+
 from flatdict import FlatDict
 from itertools import product
 from redis import Redis
@@ -19,7 +20,6 @@ from yaml import safe_load
 
 class Aggregator(StreamListener):
 
-    counter = 0
     api = None
     configuration = None
 
