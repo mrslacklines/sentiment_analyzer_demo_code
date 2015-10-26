@@ -12,4 +12,5 @@ class TripadvisorItem(scrapy.Item):
     city = scrapy.Field()
     title = scrapy.Field()
     review = scrapy.Field()
-    rating = scrapy.Field()
+    geo = scrapy.Field()
+    date = scrapy.Field()

@@ -9,7 +9,7 @@ from redis import Redis
 from tripadvisor.items import TripadvisorItem
 
 
-cities = ['new york city', 'chicago', 'boston']
+cities = ['new york city']
 
 
 class TripAdvisorSpider(scrapy.Spider):
@@ -48,12 +48,86 @@ class TripAdvisorSpider(scrapy.Spider):
                 continue
             links = result.xpath('.//a/@href').extract()
             for link in links:
+                if "-c2-" in link:
+                    continue
                 url = response.urljoin(link)
                 request = scrapy.Request(url, callback=self.parse_review_type)
                 request.meta['city_name'] = response.meta['city_name']
                 yield request
 
     def parse_review_type(self, response):
+            review_type = response.xpath(
+                './/*[@id="MAIN"]/@class').extract_first()
+            heading = response.xpath(
+                './/*[@id="HEADING"]/text()').extract_first()
+            if "Hotels" in review_type and "Bed and Breakfast" in heading:
+                pass
+            elif "Hotels" in review_type:
+                for result in self.parse_hotels_pagination(response):
+                    yield result
+            elif "Restaurants" in review_type:
+                self.parse_restaurants(response)
+            elif "Travel_Guide" in review_type:
+                pass
+            elif "Attractions" in review_type:
+                pass
+            elif "VacationRentals" in review_type:
+                pass
+
+    def parse_hotels_pagination(self, response):
+        for hotel in self.parse_hotels(response):
+            yield hotel
+        next_url = response.css(
+            '.pagination > .nav.next').xpath('./@href').extract_first()
+        if next_url:
+            url = response.urljoin(next_url)
+            request = scrapy.Request(
+                url, callback=self.parse_hotels_pagination)
+            request.meta['city_name'] = response.meta['city_name']
+            yield request
+
+    def parse_hotels(self, response):
+        hotel_urls = \
+            response.css('.listing_title').xpath('./a/@href').extract()
+        for hotel_url in hotel_urls:
+            url = response.urljoin(hotel_url)
+            request = scrapy.Request(
+                url, callback=self.parse_hotel_review_pagination)
+            request.meta['city_name'] = response.meta['city_name']
+            yield request
+
+    def parse_hotel_review_pagination(self, response):
+        for review in self.expand_hotel_reviews(response):
+            yield review
+        # TODO
+        pass
+
+    def expand_hotel_reviews(self, response):
+        review_ids = response.css(
+            '.reviewSelector').xpath('./@id').re('review_([0-9]+)')
+        hotel_id_re = (r'http://www\.tripadvisor\.com/Hotel_Review-'
+                       '([a-z][0-9]+-[a-z][0-9]+)-.+\.html')
+        hotel_id = re.match(hotel_id_re, response.url)
+        if hotel_id and review_ids:
+            hotel_id = hotel_id.groups()[0]
+        expand_url = 'http://www.tripadvisor.com/ExpandedUserReviews-'
+        expand_url += hotel_id + '?'
+        expand_url += 'target=' + review_ids[0] + '&'
+        expand_url += 'context=1&'
+        expand_url += 'reviews=' + ','.join(review_ids) + '&'
+        expand_url += 'servlet=Hotel_Review&expand=1'
+
+        request = scrapy.Request(
+            expand_url, callback=self.parse_hotel_reviews)
+        request.meta['city_name'] = response.meta['city_name']
+        yield request
+
+    def parse_hotel_reviews(self, response):
+        # TODO
+        pass
+
+    def parse_restaurants(self, response):
+        # TODO
         pass
 
     def parse_city_frontpage(self, response):
@@ -100,15 +174,28 @@ class TripAdvisorSpider(scrapy.Spider):
             request.meta['city_name'] = response.meta['city_name']
             yield request
 
-    def _clean_post_text(self, post_text)
+    def _clean_post_text(self, post_text):
         post_text = re.sub('<[^>]+>', '', post_text)
-        post_text = re.sub('\\n' '', post_text)
+        post_text = re.sub('\\n', '', post_text)
         return post_text
 
     def parse_forum_thread_page(self, response):
-        for post in response.css('.postcontent'):
+        post_title = \
+            response.xpath('.//h1[@id="HEADING"]/text()').extract_first()
+        post_title = self._clean_post_text(post_title)
+        for post in response.css('.post'):
             paragraphs = post.css('.postBody').extract()
             post_text = self._clean_post_text(' '.join(paragraphs))
-            post_date_str = post.css('.postDate').xpath('.//text()').extract_first()
+            post_date_str = \
+                post.css('.postDate').xpath('.//text()').extract_first()
             post_date = datetime.strptime(post_date_str, '%b %d, %Y, %I:%M %p')
-            import ipdb; ipdb.set_trace()  # breakpoint 1fc0e6d3 //
+            post_location = \
+                post.css('.location').xpath('text()').extract_first()
+            item = TripadvisorItem(
+                city=response.meta['city_name'],
+                geo=post_location,
+                review=post_text,
+                date=post_date,
+                title=post_title
+            )
+            yield item

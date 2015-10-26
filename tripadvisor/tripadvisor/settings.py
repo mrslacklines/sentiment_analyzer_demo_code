@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import logging
+
 # Scrapy settings for tripadvisor project
 #
 # For simplicity, this file contains only settings considered important or
@@ -13,6 +15,8 @@ BOT_NAME = 'tripadvisor'
 
 SPIDER_MODULES = ['tripadvisor.spiders']
 NEWSPIDER_MODULE = 'tripadvisor.spiders'
+
+LOG_LEVEL = logging.INFO
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
