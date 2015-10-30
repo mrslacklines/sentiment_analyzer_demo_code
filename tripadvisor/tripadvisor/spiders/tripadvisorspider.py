@@ -42,89 +42,140 @@ class TripAdvisorSpider(scrapy.Spider):
             request = scrapy.Request(
                 url, callback=self.parse_city_frontpage)
             request.meta['city_name'] = response.meta['city_name']
-            yield request
+            # yield request
         for result in location_results:
             if response.meta['city_name'] not in result.extract().lower():
                 continue
-            links = result.xpath('.//a/@href').extract()
+            links = result.xpath('.//a[@href]')
             for link in links:
-                if "-c2-" in link:
+                link_text = link.xpath('text()').extract_first()
+                link_dest = link.xpath('@href').extract_first()
+                url = response.urljoin(link_dest)
+                import ipdb; ipdb.set_trace()  # breakpoint 47d6283c //
+                if 'Hotels' in link_text:
+                    callback = self.parse_hotels_pagination
+                elif 'B&B and Inns' in link_text:
+                    callback = self.parse_bnb_pagination
+                elif 'Vacation Rentals' in link_text:
                     continue
-                url = response.urljoin(link)
-                request = scrapy.Request(url, callback=self.parse_review_type)
+                elif 'Restaurants' in link_text:
+                    continue
+                elif 'Things to do' in link_text:
+                    continue
+                else:
+                    continue
+                request = scrapy.Request(url, callback=callback)
                 request.meta['city_name'] = response.meta['city_name']
                 yield request
 
-    def parse_review_type(self, response):
-            review_type = response.xpath(
-                './/*[@id="MAIN"]/@class').extract_first()
-            heading = response.xpath(
-                './/*[@id="HEADING"]/text()').extract_first()
-            if "Hotels" in review_type and "Bed and Breakfast" in heading:
-                pass
-            elif "Hotels" in review_type:
-                for result in self.parse_hotels_pagination(response):
-                    yield result
-            elif "Restaurants" in review_type:
-                self.parse_restaurants(response)
-            elif "Travel_Guide" in review_type:
-                pass
-            elif "Attractions" in review_type:
-                pass
-            elif "VacationRentals" in review_type:
-                pass
-
     def parse_hotels_pagination(self, response):
-        for hotel in self.parse_hotels(response):
-            yield hotel
+        # for hotel in self.parse_hotels(response):
+        #     yield hotel
         next_url = response.css(
             '.pagination > .nav.next').xpath('./@href').extract_first()
+        import ipdb; ipdb.set_trace()  # breakpoint 260bfbe1 //
         if next_url:
             url = response.urljoin(next_url)
             request = scrapy.Request(
                 url, callback=self.parse_hotels_pagination)
             request.meta['city_name'] = response.meta['city_name']
             yield request
+        else:
+            while True:
+                pass
+
+    def parse_bnb_pagination(self, response):
+        # for hotel in self.parse_hotels(response):
+        #     yield hotel
+        next_url = response.css(
+            '.pagination > .nav.next').xpath('./@href').extract_first()
+        import ipdb; ipdb.set_trace()  # breakpoint 260bfbe1 //
+        if next_url:
+            url = response.urljoin(next_url)
+            request = scrapy.Request(
+                url, callback=self.parse_bnb_pagination)
+            request.meta['city_name'] = response.meta['city_name']
+            yield request
+        else:
+            while True:
+                pass
 
     def parse_hotels(self, response):
-        hotel_urls = \
-            response.css('.listing_title').xpath('./a/@href').extract()
-        for hotel_url in hotel_urls:
-            url = response.urljoin(hotel_url)
+        pass
+        # hotel_urls = \
+        #     response.css('.listing_title').xpath('./a/@href').extract()
+        # for hotel_url in hotel_urls:
+        #     url = response.urljoin(hotel_url)
+        #     request = scrapy.Request(
+        #         url, callback=self.parse_hotel_review_pagination)
+        #     request.meta['city_name'] = response.meta['city_name']
+        #     yield request
+
+    def parse_hotel_review_pagination(self, response):
+        for review in self.expand_hotel_reviews(response):
+            yield review
+        next_url = response.css('.nav.next').xpath('@href').extract_first()
+        if next_url:
+            url = response.urljoin(next_url)
             request = scrapy.Request(
                 url, callback=self.parse_hotel_review_pagination)
             request.meta['city_name'] = response.meta['city_name']
             yield request
 
-    def parse_hotel_review_pagination(self, response):
-        for review in self.expand_hotel_reviews(response):
-            yield review
-        # TODO
-        pass
-
     def expand_hotel_reviews(self, response):
         review_ids = response.css(
             '.reviewSelector').xpath('./@id').re('review_([0-9]+)')
-        hotel_id_re = (r'http://www\.tripadvisor\.com/Hotel_Review-'
-                       '([a-z][0-9]+-[a-z][0-9]+)-.+\.html')
-        hotel_id = re.match(hotel_id_re, response.url)
-        if hotel_id and review_ids:
-            hotel_id = hotel_id.groups()[0]
-        expand_url = 'http://www.tripadvisor.com/ExpandedUserReviews-'
-        expand_url += hotel_id + '?'
-        expand_url += 'target=' + review_ids[0] + '&'
-        expand_url += 'context=1&'
-        expand_url += 'reviews=' + ','.join(review_ids) + '&'
-        expand_url += 'servlet=Hotel_Review&expand=1'
+        if review_ids:
+            hotel_id_re = (r'http://www\.tripadvisor\.com/Hotel_Review-'
+                           '([a-z][0-9]+-[a-z][0-9]+)-.+\.html')
+            hotel_id = re.match(hotel_id_re, response.url)
+            if hotel_id:
+                hotel_id = hotel_id.groups()[0]
+            expand_url = 'http://www.tripadvisor.com/ExpandedUserReviews-'
 
-        request = scrapy.Request(
-            expand_url, callback=self.parse_hotel_reviews)
-        request.meta['city_name'] = response.meta['city_name']
-        yield request
+            expand_url += hotel_id + '?'
+            expand_url += 'target=' + review_ids[0] + '&'
+            expand_url += 'context=1&'
+            expand_url += 'reviews=' + ','.join(review_ids) + '&'
+            expand_url += 'servlet=Hotel_Review&expand=1'
+
+            request = scrapy.Request(
+                expand_url, callback=self.parse_hotel_reviews)
+            request.meta['city_name'] = response.meta['city_name']
+            yield request
 
     def parse_hotel_reviews(self, response):
-        # TODO
-        pass
+        for review in response.css('div[id^=expanded_review]'):
+            post_location = review.css(
+                '.location').xpath('text()').extract_first()
+            post_text = self._clean_post_text(' '.join(
+                review.css('.entry').xpath('./p/text()').extract()))
+            post_date_title = review.css(
+                '.ratingDate').xpath('@title').extract_first()
+            post_date_text = re.match(
+                r'Reviewed ([A-Z][a-z]+ [0-9]{1,2}, [0-9]{4})',
+                review.css(
+                    '.ratingDate').xpath('text()').extract_first())
+            if post_date_title:
+                post_date = datetime.strptime(
+                    post_date_title,
+                    '%B %d, %Y')
+            elif post_date_text:
+                post_date = datetime.strptime(
+                    post_date_text.groups()[0],
+                    '%B %d, %Y')
+            else:
+                continue
+            post_title = self._clean_post_text(
+                review.css('.noQuotes').xpath('text()').extract_first())
+            item = TripadvisorItem(
+                city=response.meta['city_name'],
+                geo=post_location,
+                review=post_text,
+                date=post_date,
+                title=post_title
+            )
+            yield item
 
     def parse_restaurants(self, response):
         # TODO
