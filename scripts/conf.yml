@@ -41,3 +41,8 @@ TWITTER:
 
 MAX_TWEETS: 1000
 MAX_QUERY: 125
+
+TRIPADVISOR:
+    URL: http://www.tripadvisor.com
+    CITIES:
+        - chicago
