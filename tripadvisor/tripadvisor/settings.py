@@ -18,6 +18,9 @@ NEWSPIDER_MODULE = 'tripadvisor.spiders'
 
 LOG_LEVEL = logging.INFO
 
+AWS_ACCESS_KEY_ID = ""
+AWS_SECRET_ACCESS_KEY = ""
+
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
 #USER_AGENT = 'tripadvisor (+http://www.yourdomain.com)'

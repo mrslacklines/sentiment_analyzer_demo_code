@@ -1,32 +1,15 @@
 # -*- coding: utf-8 -*-
 
-import argparse
 import re
 import scrapy
-import sys
 
 from datetime import datetime, timedelta
 from redis import Redis
 from scrapy.crawler import CrawlerProcess
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
-from scrapy.utils.project import get_project_settings
-from yaml import safe_load
 
-
-class TripadvisorItem(scrapy.Item):
-    city = scrapy.Field()
-    title = scrapy.Field()
-    review = scrapy.Field()
-    geo = scrapy.Field()
-    date = scrapy.Field()
-
-    def __init__(self, city, title, review, geo, date):
-        self.city = city
-        self.title = title
-        self.review = review
-        self.geo = geo
-        self.date = date
+from tripadvisor.items import TripadvisorItem
 
 
 def process_onclick_link(value):
@@ -38,6 +21,8 @@ def process_onclick_link(value):
 class TripAdvisorSpider(CrawlSpider):
     name = "ta_spider"
     allowed_domains = ["tripadvisor.com"]
+    start_urls = ['http://www.tripadvisor.com/Search?q=chicago',]
+
     next_page = LinkExtractor(restrict_xpaths='//link[@rel="next"]',
                               tags=('link',), attrs=('href',))
     category = LinkExtractor(restrict_css='.navLinks')
@@ -46,18 +31,27 @@ class TripAdvisorSpider(CrawlSpider):
                                        process_value=process_onclick_link)
     sidebar_categories = LinkExtractor(restrict_css='.accommodation_type')
     properties = LinkExtractor(restrict_css='.property_title')
+    thread_xpath = ('//table[contains(concat(" ", normalize-space(@class), '
+                    '" "), " topics ")]/tr/td[2]/b')
+    forum_thread = LinkExtractor(restrict_xpaths=thread_xpath)
+    pagination_forum = LinkExtractor(restrict_css='.pgLinks')
 
     def __init__(self):
         self._rules = (
             Rule(self.category, follow=True),
-            Rule(self.next_page, follow=True),
+            Rule(self.next_page, follow=True, callback=self.parse_properties),
             Rule(self.city_search_result, follow=True),
             Rule(self.sidebar_categories, follow=True),
-            Rule(self.properties, follow=True, callback=self.parse_properties)
+            Rule(self.properties, follow=True, callback=self.parse_properties),
+            Rule(self.forum_thread, follow=True,
+                callback=self.parse_forum_posts),
+            Rule(self.pagination_forum, follow=True,
+                callback=self.parse_forum_posts)
         )
-        self.redis = Redis(
-            host='redis',
-            db=configuration.get('REDIS_SETTINGS', {}).get('TRIPADVISOR_DB'))
+
+        # self.redis = Redis(
+        #     host='redis',
+        #     db=configuration.get('REDIS_SETTINGS', {}).get('TRIPADVISOR_DB'))
 
     def _clean_post_text(self, post_text):
         post_text = re.sub('<[^>]+>', '', post_text)
@@ -119,75 +113,23 @@ class TripAdvisorSpider(CrawlSpider):
             )
             yield item
 
-
-def read_config(filehandle):
-        return safe_load(filehandle)
-
-
-def main(arguments):
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument(
-        'config', help="Config file", type=argparse.FileType('r'))
-
-    args = parser.parse_args(arguments)
-
-    configuration = read_config(args.config)
-    cities = configuration.get('TRIPADVISOR', {}).get('CITIES')
-    search_url = configuration.get('TRIPADVISOR', {}).get('URL') + '/Search?q='
-    start_urls = [search_url + re.sub(' ', '+', city) for city in cities]
-
-    process = CrawlerProcess(get_project_settings())
-
-    process.crawl(TripAdvisorSpider)
-    process.start()
-
-
-if __name__ == '__main__':
-    main(sys.argv[1:])
-
-
-
-    # def parse_forum(self, response):
-    #     for row in response.xpath('//table/tr'):
-    #         if row.xpath('./td/@class').extract_first() == 'tHead':
-    #             continue
-    #         topic_url = row.xpath("./td/b/a/@href").extract_first()
-    #         url = response.urljoin(topic_url)
-    #         request = scrapy.Request(url, callback=self.parse_forum_thread)
-    #         request.meta['city_name'] = response.meta['city_name']
-    #         yield request
-
-    # def parse_forum_thread(self, response):
-    #     self.parse_forum_thread_page(response)
-    #     css_selector = ".pagination > #pager_top2 > .guiArw.sprite-pageNext"
-    #     next_url = response.css(css_selector).extract_first()
-    #     if next_url:
-    #         url = response.urljoin(next_url)
-    #         request = scrapy.Request(
-    #             url, callback=self.parse_forum_thread)
-    #         request.meta['city_name'] = response.meta['city_name']
-    #         yield request
-
-
-    # def parse_forum_thread_page(self, response):
-    #     post_title = \
-    #         response.xpath('.//h1[@id="HEADING"]/text()').extract_first()
-    #     post_title = self._clean_post_text(post_title)
-    #     for post in response.css('.post'):
-    #         paragraphs = post.css('.postBody').extract()
-    #         post_text = self._clean_post_text(' '.join(paragraphs))
-    #         post_date_str = \
-    #             post.css('.postDate').xpath('.//text()').extract_first()
-    #         post_date = datetime.strptime(post_date_str, '%b %d, %Y, %I:%M %p')
-    #         post_location = \
-    #             post.css('.location').xpath('text()').extract_first()
-    #         item = TripadvisorItem(
-    #             city=response.meta['city_name'],
-    #             geo=post_location,
-    #             review=post_text,
-    #             date=post_date,
-    #             title=post_title
-    #         )
-    #         yield item
+    def parse_forum_posts(self, response):
+        post_title = \
+            response.xpath('.//h1[@id="HEADING"]/text()').extract_first()
+        post_title = self._clean_post_text(post_title)
+        for post in response.css('.post'):
+            paragraphs = post.css('.postBody').extract()
+            post_text = self._clean_post_text(' '.join(paragraphs))
+            post_date_str = \
+                post.css('.postDate').xpath('.//text()').extract_first()
+            post_date = datetime.strptime(post_date_str, '%b %d, %Y, %I:%M %p')
+            post_location = \
+                post.css('.location').xpath('text()').extract_first()
+            item = TripadvisorItem(
+                city='test',
+                geo=post_location,
+                review=post_text,
+                date=post_date,
+                title=post_title
+            )
+            yield item
