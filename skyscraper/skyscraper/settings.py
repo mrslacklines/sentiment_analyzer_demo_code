@@ -2,10 +2,10 @@
 
 import logging
 
-BOT_NAME = 'tripadvisor'
+BOT_NAME = 'skyscraper'
 
-SPIDER_MODULES = ['tripadvisor.spiders']
-NEWSPIDER_MODULE = 'tripadvisor.spiders'
+SPIDER_MODULES = ['skyscraper.spiders']
+NEWSPIDER_MODULE = 'skyscraper.spiders'
 
 LOG_LEVEL = logging.DEBUG
 

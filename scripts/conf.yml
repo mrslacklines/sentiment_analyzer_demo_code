@@ -32,7 +32,7 @@ TWITTER:
 
     CITIES:
         - chicago
-        - new york
+        - new york city
         - boston
 
     LANGUAGES:
@@ -46,3 +46,12 @@ TRIPADVISOR:
     URL: http://www.tripadvisor.com
     CITIES:
         - chicago
+        - new york city
+        - boston
+
+SKYSCRAPER:
+    URL: http://forum.skyscraperpage.com
+    CITIES:
+        - chicago
+        - new york
+        - boston

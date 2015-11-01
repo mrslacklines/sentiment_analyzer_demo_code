@@ -8,6 +8,7 @@ from redis import Redis
 from scrapy.crawler import CrawlerProcess
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
+from yaml import safe_load
 
 from tripadvisor.items import TripadvisorItem
 
@@ -21,8 +22,6 @@ def process_onclick_link(value):
 class TripAdvisorSpider(CrawlSpider):
     name = "ta_spider"
     allowed_domains = ["tripadvisor.com"]
-    start_urls = ['http://www.tripadvisor.com/Search?q=chicago',]
-
     next_page = LinkExtractor(restrict_xpaths='//link[@rel="next"]',
                               tags=('link',), attrs=('href',))
     category = LinkExtractor(restrict_css='.navLinks')
@@ -36,7 +35,17 @@ class TripAdvisorSpider(CrawlSpider):
     forum_thread = LinkExtractor(restrict_xpaths=thread_xpath)
     pagination_forum = LinkExtractor(restrict_css='.pgLinks')
 
-    def __init__(self):
+    def __init__(self, config):
+        self.configuration = self._read_config(config)
+        self.redis = Redis(
+            host='redis',
+            db=self.configuration.get(
+                'REDIS_SETTINGS', {}).get('TRIPADVISOR_DB'))
+        cities = self.configuration.get('TRIPADVISOR', {}).get('CITIES')
+        self.base_url = self.configuration.get('TRIPADVISOR', {}).get('URL')
+        self.start_urls = \
+            [self.base_url + '/Search?q=' + re.sub(r' ', r'+', city)
+                           for city in cities]
         self._rules = (
             Rule(self.category, follow=True),
             Rule(self.next_page, follow=True, callback=self.parse_properties),
@@ -44,14 +53,14 @@ class TripAdvisorSpider(CrawlSpider):
             Rule(self.sidebar_categories, follow=True),
             Rule(self.properties, follow=True, callback=self.parse_properties),
             Rule(self.forum_thread, follow=True,
-                callback=self.parse_forum_posts),
+                 callback=self.parse_forum_posts),
             Rule(self.pagination_forum, follow=True,
-                callback=self.parse_forum_posts)
+                 callback=self.parse_forum_posts)
         )
 
-        # self.redis = Redis(
-        #     host='redis',
-        #     db=configuration.get('REDIS_SETTINGS', {}).get('TRIPADVISOR_DB'))
+    def _read_config(self, filename):
+        filehandle = open(filename, 'r')
+        return safe_load(filehandle)
 
     def _clean_post_text(self, post_text):
         post_text = re.sub('<[^>]+>', '', post_text)
