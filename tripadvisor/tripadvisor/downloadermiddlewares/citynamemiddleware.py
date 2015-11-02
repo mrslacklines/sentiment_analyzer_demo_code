@@ -9,17 +9,7 @@ logger = logging.getLogger(__name__)
 
 class CityMiddleware(object):
 
-    """This middleware add city information to response.meta"""
-
-    # def process_response(self, request, response, spider):
-    #     if not hasattr(response, 'meta'):
-    #         import ipdb
-    # ipdb.set_trace()  # breakpoint c20c7f55 //
-
-    #     response.meta['city'] = request.meta['city']
-    #     import ipdb
-    # ipdb.set_trace()  # breakpoint 60d978b7 //
-    #     return response
+    """This middleware adds city information to response.meta"""
 
     def process_request(self, request, spider):
         city_name = re.match(

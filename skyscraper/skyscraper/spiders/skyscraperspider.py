@@ -28,8 +28,9 @@ class SkyScraperSpider(CrawlSpider):
             host='redis',
             db=self.configuration.get(
                 'REDIS_SETTINGS', {}).get('SKYSCRAPER_DB'))
-        cities = self.configuration.get('SKYSCRAPER', {}).get('CITIES')
-        start_urls = [self.configuration.get('SKYSCRAPER', {}).get('URL'),]
+        self.cities = self.configuration.get('SKYSCRAPER', {}).get('CITIES')
+        self.base_url = self.configuration.get('SKYSCRAPER', {}).get('URL')
+        self.start_urls = [self.base_url,]
         self._rules = (
             Rule(self.forum, follow=True),
             Rule(self.next_page, follow=True),
@@ -66,23 +67,33 @@ class SkyScraperSpider(CrawlSpider):
         return post_text
 
     def parse_posts(self, response):
-        for post in response.xpath('//table[contains(@id, "post")]'):
-            city = 'test'
-            post_xpath = './/div[contains(@id, "post_message_")]/text()'
-            post_text = self._clean_post_text(
-                " ".join(post.xpath(post_xpath).extract()))
-            location_xpath = ('.//td[contains(concat(" ", normalize-space('
-                              '@class), " "), " alt2 ")]/table/tr/td['
-                              'contains(concat(" ", normalize-space(@valign'
-                              '), " ")," top ")]/div/div[2]/text()')
-            geo = post.xpath(location_xpath).re('Location: (.+)')
-            date_xpath = ('.//td[contains(concat(" ", normalize-space('
-                          '@class), " "), " thead ")]/div/span/span/b/text()')
-            date = self._extract_time(post.xpath(date_xpath).extract_first())
-            # self.redis.lpush(
-            #     city.lower(), {
-            #         'ts': status.timestamp_ms,
-            #         'text': status.text,
-            #         'location': status.place})
-
-        pass
+        thread_topic_xpath = ('//td[contains(@class, "alt1")]/table/tr/'
+                              'td[contains(@class, "navbar")]/strong/text()')
+        thread_topic = re.sub(
+            r'[\n\r\t]',
+            r' ',
+            response.xpath(thread_topic_xpath).extract_first()).lower().strip()
+        for city_name in self.cities:
+            if re.match(r'^' + city_name.lower(), thread_topic):
+                city = city_name
+                for post in response.xpath('//table[contains(@id, "post")]'):
+                    post_xpath =\
+                        './/div[contains(@id, "post_message_")]/text()'
+                    post_text = self._clean_post_text(
+                        " ".join(post.xpath(post_xpath).extract()))
+                    location_xpath = \
+                        ('.//td[contains(concat(" ", normalize-space('
+                         '@class), " "), " alt2 ")]/table/tr/td['
+                         'contains(concat(" ", normalize-space(@valign'
+                         '), " ")," top ")]/div/div[2]/text()')
+                    geo = post.xpath(location_xpath).re('Location: (.+)')
+                    date_xpath = ('.//td[contains(concat(" ", normalize-space('
+                                  '@class), " "), " thead ")]'
+                                  '/div/span/span/b/text()')
+                    date = self._extract_time(
+                        post.xpath(date_xpath).extract_first())
+                    # self.redis.lpush(
+                    #     city.lower(), {
+                    #         'ts': status.timestamp_ms,
+                    #         'text': status.text,
+                    #         'location': status.place})
