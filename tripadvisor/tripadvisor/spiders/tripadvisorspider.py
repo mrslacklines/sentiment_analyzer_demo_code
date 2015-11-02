@@ -6,6 +6,7 @@ import scrapy
 from datetime import datetime, timedelta
 from redis import Redis
 from scrapy.crawler import CrawlerProcess
+from scrapy.http import HtmlResponse, Request
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
 from yaml import safe_load
@@ -45,7 +46,7 @@ class TripAdvisorSpider(CrawlSpider):
         self.base_url = self.configuration.get('TRIPADVISOR', {}).get('URL')
         self.start_urls = \
             [self.base_url + '/Search?q=' + re.sub(r' ', r'+', city)
-                           for city in cities]
+             for city in cities]
         self._rules = (
             Rule(self.category, follow=True),
             Rule(self.next_page, follow=True, callback=self.parse_properties),
@@ -67,6 +68,22 @@ class TripAdvisorSpider(CrawlSpider):
         post_text = re.sub('\\n', '', post_text)
         return post_text
 
+    def _requests_to_follow(self, response):
+        if not isinstance(response, HtmlResponse):
+            return
+        seen = set()
+        for n, rule in enumerate(self._rules):
+            links = [lnk for lnk in rule.link_extractor.extract_links(response)
+                     if lnk not in seen]
+            if links and rule.process_links:
+                links = rule.process_links(links)
+            for link in links:
+                seen.add(link)
+                r = Request(url=link.url, callback=self._response_downloaded)
+                r.meta.update(rule=n, link_text=link.text)
+                r.meta.update(city=response.meta['city'])
+                yield rule.process_request(r)
+
     def parse_properties(self, response):
         review_ids = response.css(
             '.reviewSelector').xpath('./@id').re('review_([0-9]+)')
@@ -85,7 +102,7 @@ class TripAdvisorSpider(CrawlSpider):
                 servlet = property_data.groups()[1] + property_data.groups()[0]
                 expand_url += 'servlet=' + servlet + '&expand=1'
 
-                request = scrapy.Request(
+                request = Request(
                     expand_url, callback=self.parse_reviews)
                 yield request
 
