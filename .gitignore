@@ -1,5 +1,6 @@
 *.zip
 *.csv
+*~
 *_dataset
 
 # Byte-compiled / optimized / DLL files

@@ -4,6 +4,10 @@ OAUTH:
     ACCESS_TOKEN: 9582312-YaCYXFnKqzx0ACzEdxKB28wgz9jJInyvof7jw8VBLd
     ACCESS_TOKEN_SECRET: 5VKjpNvuQRubWtwgyDyNqkIFTqrEzLJdUgM3hy1JK05vM
 
+REDIS_SETTINGS:
+    TWITTER_DB: 0
+    TRIPADVISOR_DB: 1
+    SKYSCRAPER_DB: 2
 
 TWITTER:
     HASHTAGS:
@@ -26,7 +30,7 @@ TWITTER:
 
     CITIES:
         - chicago
-        - new york
+        - new york city
         - boston
 
     LANGUAGES:
@@ -36,5 +40,18 @@ TWITTER:
 MAX_TWEETS: 1000
 MAX_QUERY: 125
 
+TRIPADVISOR:
+    URL: http://www.tripadvisor.com
+    CITIES:
+        - chicago
+        - new york city
+        - boston
+
+SKYSCRAPER:
+    URL: http://forum.skyscraperpage.com
+    CITIES:
+        - chicago
+        - new york
+        - boston
 CLASSIFIER:
     MODELS_DIR: '/home/tomek/workspace/mbsaa/res/models/'
