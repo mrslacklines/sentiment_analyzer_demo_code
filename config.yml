@@ -54,4 +54,4 @@ SKYSCRAPER:
         - new york
         - boston
 CLASSIFIER:
-    MODELS_DIR: '/home/tomek/workspace/mbsaa/res/models/'
+    MODELS_DIR: '/home/tomek/workspace/mbsaa/res/models'

@@ -10,7 +10,6 @@ import scrapy
 
 class TripadvisorItem(scrapy.Item):
     city = scrapy.Field()
-    title = scrapy.Field()
-    review = scrapy.Field()
+    text = scrapy.Field()
     geo = scrapy.Field()
     date = scrapy.Field()

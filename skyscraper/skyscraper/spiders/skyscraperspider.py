@@ -94,6 +94,6 @@ class SkyScraperSpider(CrawlSpider):
                         post.xpath(date_xpath).extract_first())
                     # self.redis.lpush(
                     #     city.lower(), {
-                    #         'ts': status.timestamp_ms,
+                    #         'date': status.timestamp_ms,
                     #         'text': status.text,
-                    #         'location': status.place})
+                    #         'geo': status.place})

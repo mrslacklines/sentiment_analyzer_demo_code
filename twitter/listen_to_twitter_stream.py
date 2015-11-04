@@ -6,20 +6,22 @@ Aggregates tweets for a given set of keywords
 """
 
 import argparse
+import json
 import re
 import sys
 
 from datetime import datetime
 from flatdict import FlatDict
+from geopy import geocoders
+from incf.countryutils import transformations
+from incf.countryutils.datatypes import Country
 from itertools import product
 import logging
 from redis import Redis
-from requests import ConnectionError
-from tweepy import (
-    API, OAuthHandler, Stream, StreamListener, TweepError)
+from tweepy import OAuthHandler, Stream, StreamListener
 from yaml import safe_load
 
-from sentiment_analyzer.sentiment_analyzer import Classifier
+# from sentiment_analyzer.sentiment_analyzer import Classifier
 
 
 logger = logging.getLogger(__name__)
@@ -27,14 +29,17 @@ logger = logging.getLogger(__name__)
 
 class Aggregator(StreamListener):
 
-    api = None
-    configuration = None
-
     def __init__(self, config_file_handle):
         self.configuration = self._read_config(config_file_handle)
-        self.api = self.api or self._set_twitter_rest_api()
         self.redis = Redis(host='redis', db=self.configuration.get(
             'REDIS_SETTINGS', {}).get('TWITTER_DB'))
+        self.twitter_model = self.configuration.get(
+            'CLASSIFIER', {}).get('MODELS_DIR') + '/twitter'
+        self.redis = Redis(
+            host='redis',
+            db=self.configuration.get(
+                'REDIS_SETTINGS', {}).get('TWITTER_DB'))
+        self.geo = geocoders.GoogleV3()
 
     def on_error(self, status_code):
         logger.error(status_code)
@@ -42,15 +47,28 @@ class Aggregator(StreamListener):
     def on_disconnect(self):
         self.counter = 0
 
-    def on_status(self, status):
-        for word in re.sub(r'#', r'', status.text).lower().split():
+    def on_data(self, data):
+        status = json.loads(data)
+        for word in re.sub(r'#', r'', status.get('text')).lower().split():
             if word.lower() in self.configuration.get(
                     'TWITTER', {}). get('CITIES'):
+                text = status.get('text')
+                date = datetime.fromtimestamp(
+                    int(status.get('timestamp_ms'))/1000.0)
+                geo = status.get('user').get('location')
+                place, (lat, lng) = self.geo.geocode(geo)
+                geo_data = place.split(', ')
+                if len(geo_data) > 1:
+                    country = Country(geo_data[-1])
+                    continent = country.continent
+                else:
+                    country = geo
+                    continent = None
                 self.redis.lpush(
                     word.lower(), {
-                        'date': status.timestamp_ms,
-                        'text': status.text,
-                        'geo': status.place})
+                        'date': date,
+                        'text': text,
+                        'geo': (country, continent)})
 
     def _read_config(self, filehandle):
         return safe_load(filehandle)

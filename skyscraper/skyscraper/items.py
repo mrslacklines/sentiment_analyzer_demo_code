@@ -10,6 +10,6 @@ import scrapy
 
 class SkyScraperItem(scrapy.Item):
     city = scrapy.Field()
-    review = scrapy.Field()
+    text = scrapy.Field()
     geo = scrapy.Field()
     date = scrapy.Field()

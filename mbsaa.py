@@ -1,21 +1,57 @@
-from flask import (
-    abort, flash, Flask, g, redirect, render_template, request, session,
-    url_for
-)
-from redis import Redis
+from flask import abort, Flask
+from flask.json import jsonify
+from subprocess import Popen
+from time import sleep
 
-DATABASE = '/tmp/flaskr.db'
 DEBUG = True
-SECRET_KEY = 'development key'
-USERNAME = 'admin'
-PASSWORD = 'default'
 
 app = Flask(__name__)
 app.config.from_object(__name__)
 
+PROCESS_DICT = {}
 
-def connect_db(db):
-    Redis(host='redis', db=db)
 
-if __name__ == '__main__':
-    app.run()
+@app.route('/start_spider/<spider_name>')
+def start_tripadvisor_spider(spider_name):
+    dir = spider_name + '/'
+    if spider_name.lower() == 'tripadvisor':
+        spider_name = 'ta_spider'
+    elif spider_name.lower() == 'skyscraper':
+        spider_name = 'ss_spider'
+    else:
+        return abort(500)
+    PROCESS_DICT[spider_name] = Popen(
+        ['scrapy', 'crawl', spider_name, '-a', 'config=/opt/mbsaa/config.yml'],
+        cwd=dir)
+    sleep(10)
+    return jsonify(**{'status': PROCESS_DICT[spider_name].poll()})
+
+
+@app.route('/resume_spider/<spider_name>')
+def resume_tripadvisor_spider(spider_name):
+    dir = spider_name + '/'
+    crawls_dir_param = 'JOBDIR=crawls/' + spider_name
+    if spider_name.lower() == 'tripadvisor':
+        spider_name = ta_spider
+    elif spider_name.lower() == 'skyscraper':
+        spider_name = ss_spider
+    else:
+        return abort(404)
+    PROCESS_DICT[spider_name] = Popen(
+        ['scrapy', 'crawl', spider_name, '-a', 'config=/opt/mbsaa/config.yml',
+         '-s', crawls_dir_param
+         ],
+        cwd=dir)
+    sleep(10)
+    return jsonify(**{'status': process.poll()})
+
+
+@app.route('/stop_crawls/')
+def stop_crawls():
+    if PROCESS_DICT:
+        for process in PROCESS_DICT.keys():
+            PROCESS_DICT[process].kill()
+        status = 'kill signals sent'
+    else:
+        status = 'no active crawls found'
+    return jsonify(**{'status': status})

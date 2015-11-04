@@ -103,7 +103,8 @@ class TripAdvisorSpider(CrawlSpider):
                 expand_url += 'servlet=' + servlet + '&expand=1'
 
                 request = Request(
-                    expand_url, callback=self.parse_reviews)
+                    expand_url, meta={'city': response.meta['city']},
+                    callback=self.parse_reviews)
                 yield request
 
     def parse_reviews(self, response):
@@ -131,11 +132,10 @@ class TripAdvisorSpider(CrawlSpider):
             post_title = self._clean_post_text(
                 review.css('.noQuotes').xpath('text()').extract_first())
             item = TripadvisorItem(
-                city='test',
+                city=response.meta['city'],
                 geo=post_location,
-                review=post_text,
-                date=post_date,
-                title=post_title
+                text=post_text,
+                date=post_date
             )
             yield item
 
@@ -152,10 +152,9 @@ class TripAdvisorSpider(CrawlSpider):
             post_location = \
                 post.css('.location').xpath('text()').extract_first()
             item = TripadvisorItem(
-                city='test',
+                city=response.meta['city'],
                 geo=post_location,
-                review=post_text,
-                date=post_date,
-                title=post_title
+                text=post_text,
+                date=post_date
             )
             yield item
