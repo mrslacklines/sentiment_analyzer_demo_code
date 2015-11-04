@@ -1,0 +1,40 @@
+OAUTH:
+    CONSUMER_KEY: Hzg3U5TT8ZBP5vQf5zwMs5sTA
+    CONSUMER_SECRET: M58LEWeNob8I5ZZZ3wL60n6VJ2UXCl8XxlFMuFRWwMXMraVkFR
+    ACCESS_TOKEN: 9582312-YaCYXFnKqzx0ACzEdxKB28wgz9jJInyvof7jw8VBLd
+    ACCESS_TOKEN_SECRET: 5VKjpNvuQRubWtwgyDyNqkIFTqrEzLJdUgM3hy1JK05vM
+
+
+TWITTER:
+    HASHTAGS:
+        - business
+        - smallbusiness
+        - money
+        - enterpreneur
+        - enterpreneurship
+        - biz
+        - smallbiz
+        - work
+        - company
+        - companies
+        - career
+        - careers
+        - job
+        - jobs
+        - economy
+        - finance
+
+    CITIES:
+        - chicago
+        - new york
+        - boston
+
+    LANGUAGES:
+        - en
+        - en-gb
+
+MAX_TWEETS: 1000
+MAX_QUERY: 125
+
+CLASSIFIER:
+    MODELS_DIR: '/home/tomek/workspace/mbsaa/res/models/'
