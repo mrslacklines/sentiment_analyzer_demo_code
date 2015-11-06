@@ -19,7 +19,7 @@ def start_tripadvisor_spider(spider_name):
     elif spider_name.lower() == 'skyscraper':
         spider_name = 'ss_spider'
     else:
-        return abort(500)
+        return abort(404)
     PROCESS_DICT[spider_name] = Popen(
         ['scrapy', 'crawl', spider_name, '-a', 'config=/opt/mbsaa/config.yml'],
         cwd=dir)
@@ -55,3 +55,7 @@ def stop_crawls():
     else:
         status = 'no active crawls found'
     return jsonify(**{'status': status})
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0')

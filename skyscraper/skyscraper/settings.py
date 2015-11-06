@@ -12,7 +12,7 @@ DOWNLOADER_MIDDLEWARES = {
     'tripadvisor.downloadermiddlewares.singlesessiondupe.CleanUrl': 1000,
 }
 
-LOG_LEVEL = logging.DEBUG
+LOG_LEVEL = logging.INFO
 
 AWS_ACCESS_KEY_ID = ""
 AWS_SECRET_ACCESS_KEY = ""

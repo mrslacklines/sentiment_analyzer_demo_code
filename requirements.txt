@@ -1,11 +1,11 @@
 redis==2.10.3
 requests==2.8.1
-django==1.7.2
 nltk==3.0.4
 tweepy==3.3.0
 scrapy==1.0.3
-celery==3.1.17
 geopy
 incf.countryutils
 flatdict
+flask
 pyyaml
+cherrypy

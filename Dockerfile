@@ -13,4 +13,8 @@ RUN mkdir -p /var/log/supervisor
 RUN pip install supervisor --pre
 RUN pip install -r /opt/mbsaa/requirements.txt
 
-CMD supervisord -c /etc/supervisor/conf.d/supervisord.conf
+EXPOSE 5000
+
+RUN supervisord -c /etc/supervisor/conf.d/supervisord.conf
+
+CMD python /opt/mbsaa/server.py
