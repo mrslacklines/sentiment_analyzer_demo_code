@@ -12,8 +12,8 @@ PROCESS_DICT = {}
 
 
 @app.route('/start_spider/<spider_name>')
-def start_tripadvisor_spider(spider_name):
-    dir = spider_name + '/'
+def start_spider(spider_name):
+    dir = '/opt/mbsaa/' + spider_name + '/'
     if spider_name.lower() == 'tripadvisor':
         spider_name = 'ta_spider'
     elif spider_name.lower() == 'skyscraper':
@@ -28,13 +28,13 @@ def start_tripadvisor_spider(spider_name):
 
 
 @app.route('/resume_spider/<spider_name>')
-def resume_tripadvisor_spider(spider_name):
-    dir = spider_name + '/'
+def resume_spider(spider_name):
+    dir = '/opt/mbsaa/' + spider_name + '/'
     crawls_dir_param = 'JOBDIR=crawls/' + spider_name
     if spider_name.lower() == 'tripadvisor':
-        spider_name = ta_spider
+        spider_name = 'ta_spider'
     elif spider_name.lower() == 'skyscraper':
-        spider_name = ss_spider
+        spider_name = 'ss_spider'
     else:
         return abort(404)
     PROCESS_DICT[spider_name] = Popen(

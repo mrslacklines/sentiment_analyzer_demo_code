@@ -59,8 +59,9 @@ class Aggregator(StreamListener):
                 place, (lat, lng) = self.geo.geocode(geo)
                 geo_data = place.split(', ')
                 if len(geo_data) > 1:
-                    country = Country(geo_data[-1])
-                    continent = country.continent
+                    country_obj = Country(geo_data[-1])
+                    country = country_obj.name
+                    continent = country_obj.continent.name
                 else:
                     country = geo
                     continent = None

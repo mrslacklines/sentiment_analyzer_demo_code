@@ -2,7 +2,16 @@ mbsaa:
  build: .
  ports:
   - "5000:5000"
-links:
- - redis
+ links:
+  - redis
+  - rethinkdb
 redis:
-image: redis
+ ports:
+  - "6379:6379"
+ image: redis
+rethinkdb:
+ image: rethinkdb
+ ports:
+  - "8080"
+  - "28015"
+  - "29015"

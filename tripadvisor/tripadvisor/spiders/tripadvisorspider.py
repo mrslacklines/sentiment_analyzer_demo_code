@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
 import re
+import rethinkdb
 import scrapy
 
 from datetime import datetime, timedelta
+from incf.countryutils.datatypes import Country
 from redis import Redis
 from scrapy.crawler import CrawlerProcess
 from scrapy.http import HtmlResponse, Request
@@ -43,6 +45,9 @@ class TripAdvisorSpider(CrawlSpider):
             db=self.configuration.get(
                 'REDIS_SETTINGS', {}).get('TRIPADVISOR_DB'))
         cities = self.configuration.get('TRIPADVISOR', {}).get('CITIES')
+        rethinkdb.connect('rethinkdb', '28015').repl()
+        self.gazetteer = rethinkdb.db(
+            'geonames').table('geonames')
         self.base_url = self.configuration.get('TRIPADVISOR', {}).get('URL')
         self.start_urls = \
             [self.base_url + '/Search?q=' + re.sub(r' ', r'+', city)
@@ -157,4 +162,31 @@ class TripAdvisorSpider(CrawlSpider):
                 text=post_text,
                 date=post_date
             )
+            self.process_and_add_to_db(item)
             yield item
+
+    def process_and_add_to_db(self, item):
+        country = None
+        continent = None
+        if item['geo']:
+            city_name = re.sub(r'^(\w+).+$', '\g<1>', item['geo'])
+            cities = self.gazetteer.filter(
+                lambda location: location['name'].downcase().match(
+                    city_name)).run()
+            city_results = sorted(
+                [city for city in cities],
+                key=lambda k: int(k.get('population')))
+            if city_results:
+                city = city_results[-1]
+                country = city.get('country_code')
+                continent = Country(country).continent.name
+            else:
+                city = item['geo']
+        else:
+            city = None
+
+        self.redis.lpush(
+            item['city'].lower(), {
+                'date': item['date'],
+                'text': item['text'],
+                'geo': (city, country, continent)})

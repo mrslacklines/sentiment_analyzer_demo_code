@@ -9,3 +9,4 @@ flatdict
 flask
 pyyaml
 cherrypy
+rethinkdb
