@@ -9,7 +9,7 @@ NEWSPIDER_MODULE = 'skyscraper.spiders'
 
 DUPEFILTER_CLASS = 'scrapy.dupefilters.BaseDupeFilter'
 DOWNLOADER_MIDDLEWARES = {
-    'tripadvisor.downloadermiddlewares.singlesessiondupe.CleanUrl': 1000,
+    'skyscraper.downloadermiddlewares.singlesessiondupe.CleanUrl': 1000,
 }
 
 LOG_LEVEL = logging.INFO

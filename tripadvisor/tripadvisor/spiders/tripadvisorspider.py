@@ -1,16 +1,18 @@
 # -*- coding: utf-8 -*-
 
+import pickle
 import re
 import rethinkdb
 import scrapy
 
 from datetime import datetime, timedelta
 from incf.countryutils.datatypes import Country
-from redis import Redis
+from nltk import bigrams
 from scrapy.crawler import CrawlerProcess
 from scrapy.http import HtmlResponse, Request
 from scrapy.linkextractors import LinkExtractor
 from scrapy.spiders import CrawlSpider, Rule
+from pymongo import MongoClient
 from yaml import safe_load
 
 from tripadvisor.items import TripadvisorItem
@@ -40,14 +42,20 @@ class TripAdvisorSpider(CrawlSpider):
 
     def __init__(self, config):
         self.configuration = self._read_config(config)
-        self.redis = Redis(
-            host='redis',
-            db=self.configuration.get(
-                'REDIS_SETTINGS', {}).get('TRIPADVISOR_DB'))
+        self.mongo = MongoClient(
+            self.configuration.get('MONGO', {}).get('HOST'),
+            int(self.configuration.get('MONGO', {}).get('PORT'))
+        )
+        self.db_name = self.configuration.get('MONGO', {}).get('DB_NAME')
+        self.collection = self.configuration.get('MONGO', {}).get(
+            'TRIPADVISOR_COLLECTION')
+        self.db = self.mongo[self.db_name][self.collection]
         cities = self.configuration.get('TRIPADVISOR', {}).get('CITIES')
         rethinkdb.connect('rethinkdb', '28015').repl()
-        self.gazetteer = rethinkdb.db(
-            'geonames').table('geonames')
+        self.gazetteer = rethinkdb.db('geonames').table('geonames')
+        self.classifier_file = self.configuration.get('CLASSIFIER', {}).get(
+            'MODELS_DIR') + '/reviews'
+        self.classifier = pickle.load(open(self.classifier_file, 'r'))
         self.base_url = self.configuration.get('TRIPADVISOR', {}).get('URL')
         self.start_urls = \
             [self.base_url + '/Search?q=' + re.sub(r' ', r'+', city)
@@ -63,6 +71,13 @@ class TripAdvisorSpider(CrawlSpider):
             Rule(self.pagination_forum, follow=True,
                  callback=self.parse_forum_posts)
         )
+
+    def _word_feats(self, words):
+        return dict([(word, True) for word
+                     in list(words) + list(bigrams(words))])
+
+    def _classify(self, string):
+        return self.classifier.classify(self._word_feats(string.split()))
 
     def _read_config(self, filename):
         filehandle = open(filename, 'r')
@@ -169,7 +184,7 @@ class TripAdvisorSpider(CrawlSpider):
         country = None
         continent = None
         if item['geo']:
-            city_name = re.sub(r'^(\w+).+$', '\g<1>', item['geo'])
+            city_name = re.sub(r'^([\w\s]+).+$', '\g<1>', item['geo'])
             cities = self.gazetteer.filter(
                 lambda location: location['name'].downcase().match(
                     city_name)).run()
@@ -185,8 +200,10 @@ class TripAdvisorSpider(CrawlSpider):
         else:
             city = None
 
-        self.redis.lpush(
-            item['city'].lower(), {
-                'date': item['date'],
-                'text': item['text'],
-                'geo': (city, country, continent)})
+        self.db.insert_one({
+            'city': item['city'].lower(),
+            'date': item['date'],
+            'text': item['text'],
+            'geo': (city, country, continent),
+            'sentiment': self._classify(item['text'])
+        })

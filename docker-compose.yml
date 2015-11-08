@@ -3,12 +3,12 @@ mbsaa:
  ports:
   - "5000:5000"
  links:
-  - redis
+  - mongo
   - rethinkdb
-redis:
+mongo:
  ports:
-  - "6379:6379"
- image: redis
+  - "27017"
+ image: mongo
 rethinkdb:
  image: rethinkdb
  ports:

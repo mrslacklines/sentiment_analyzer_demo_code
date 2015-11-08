@@ -156,7 +156,7 @@ class FeatureExtractor:
 class Classifier():
 
     def __init__(self, train_data_filename=None, string_col=4, sentiment_col=1,
-                 test_data_filename=None, model_file=None):
+                 test_data_filename=None, model_file=None, data_source=None):
         self.train_data_filename = train_data_filename
         if test_data_filename:
             self.test_data_filename = test_data_filename
@@ -165,6 +165,9 @@ class Classifier():
             self.nb = pickle.load(open(model_file, 'r'))
         else:
             self.nb = model_file
+        self.sentiment_col = sentiment_col
+        self.string_col = string_col
+        self.data_source = data_source
 
     def classify(self, string):
         words = self.fe.tokenize(string)
@@ -184,7 +187,7 @@ class Classifier():
                 feats = self.fe.get_feats(raw_feats)
                 training_dataset.append((feats, sample[1]))
         nb = NaiveBayesClassifier.train(training_dataset)
-        with open("res/models/twitter", 'wb') as pfile:
+        with open("res/models/" + self.data_source, 'wb') as pfile:
             pickle.dump(nb, pfile, protocol=pickle.HIGHEST_PROTOCOL)
         nb.show_most_informative_features(100)
         self.nb = nb

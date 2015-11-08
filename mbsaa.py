@@ -1,7 +1,12 @@
+import argparse
+import sys
+
 from flask import abort, Flask
 from flask.json import jsonify
+from pymongo import MongoClient
 from subprocess import Popen
 from time import sleep
+from yaml import safe_load
 
 DEBUG = True
 
@@ -9,6 +14,11 @@ app = Flask(__name__)
 app.config.from_object(__name__)
 
 PROCESS_DICT = {}
+CONFIG = None
+CITIES = None
+DB_TWITTER = None
+DB_TRIPADVISOR = None
+DB_SKYSCRAPER = None
 
 
 @app.route('/start_spider/<spider_name>')
@@ -57,5 +67,28 @@ def stop_crawls():
     return jsonify(**{'status': status})
 
 
+def _read_config(filehandle):
+    return safe_load(filehandle)
+
+
+@app.route('/get_stats/')
+@app.route('/get_stats/<city>')
+def get_stats(city=None):
+    pass
+
+
+def main(arguments):
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument(
+        'config', help="Config file", type=argparse.FileType('r'))
+    args = parser.parse_args(arguments)
+    CONFIG = _read_config(args.config)
+
+    CITIES = CONFIG.get('TRIPADVISOR', {}).get('CITIES')
+    app.run(host='127.0.0.1')
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0')
+    main(sys.argv[1:])

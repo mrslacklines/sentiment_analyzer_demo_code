@@ -7,22 +7,20 @@ Aggregates tweets for a given set of keywords
 
 import argparse
 import json
+import pickle
 import re
+import rethinkdb
 import sys
 
 from datetime import datetime
 from flatdict import FlatDict
-from geopy import geocoders
-from incf.countryutils import transformations
 from incf.countryutils.datatypes import Country
 from itertools import product
 import logging
-from redis import Redis
+from nltk import bigrams
+from pymongo import MongoClient
 from tweepy import OAuthHandler, Stream, StreamListener
 from yaml import safe_load
-
-# from sentiment_analyzer.sentiment_analyzer import Classifier
-
 
 logger = logging.getLogger(__name__)
 
@@ -31,15 +29,26 @@ class Aggregator(StreamListener):
 
     def __init__(self, config_file_handle):
         self.configuration = self._read_config(config_file_handle)
-        self.redis = Redis(host='redis', db=self.configuration.get(
-            'REDIS_SETTINGS', {}).get('TWITTER_DB'))
         self.twitter_model = self.configuration.get(
             'CLASSIFIER', {}).get('MODELS_DIR') + '/twitter'
-        self.redis = Redis(
-            host='redis',
-            db=self.configuration.get(
-                'REDIS_SETTINGS', {}).get('TWITTER_DB'))
-        self.geo = geocoders.GoogleV3()
+        self.mongo = MongoClient(
+            self.configuration.get('MONGO', {}).get('HOST'),
+            int(self.configuration.get('MONGO', {}).get('PORT'))
+        )
+        self.db_name = self.configuration.get('MONGO', {}).get('DB_NAME')
+        self.collection = self.configuration.get('MONGO', {}).get(
+            'TWITTER_COLLECTION')
+        self.db = self.mongo[self.db_name][self.collection]
+        rethinkdb.connect('rethinkdb', '28015').repl()
+        self.gazetteer = rethinkdb.db('geonames').table('geonames')
+        self.classifier = pickle.load(open(self.twitter_model, 'r'))
+
+    def _word_feats(self, words):
+        return dict([(word, True) for word
+                     in list(words) + list(bigrams(words))])
+
+    def _classify(self, string):
+        return self.classifier.classify(self._word_feats(string.split()))
 
     def on_error(self, status_code):
         logger.error(status_code)
@@ -56,20 +65,35 @@ class Aggregator(StreamListener):
                 date = datetime.fromtimestamp(
                     int(status.get('timestamp_ms'))/1000.0)
                 geo = status.get('user').get('location')
-                place, (lat, lng) = self.geo.geocode(geo)
-                geo_data = place.split(', ')
-                if len(geo_data) > 1:
-                    country_obj = Country(geo_data[-1])
-                    country = country_obj.name
-                    continent = country_obj.continent.name
-                else:
-                    country = geo
-                    continent = None
-                self.redis.lpush(
-                    word.lower(), {
-                        'date': date,
-                        'text': text,
-                        'geo': (country, continent)})
+                self.process_and_add_to_db(word, date, text, geo)
+
+    def process_and_add_to_db(self, city, date, text, geo):
+        country = None
+        continent = None
+        if geo:
+            city_name = re.sub(r'^([\w\s]+).+$', '\g<1>', geo)
+            cities = self.gazetteer.filter(
+                lambda location: location['name'].downcase().match(
+                    city_name)).run()
+            city_results = sorted(
+                [city for city in cities],
+                key=lambda k: int(k.get('population')))
+            if city_results:
+                post_city = city_results[-1]
+                country = city.get('country_code')
+                continent = Country(country).continent.name
+            else:
+                post_city = geo
+        else:
+            post_city = None
+
+        self.db.insert_one({
+            'city': city.lower(),
+            'date': date,
+            'text': text,
+            'geo': (post_city, country, continent),
+            'sentiment': self._classify(text)
+        })
 
     def _read_config(self, filehandle):
         return safe_load(filehandle)

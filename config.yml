@@ -4,10 +4,13 @@ OAUTH:
     ACCESS_TOKEN: 9582312-YaCYXFnKqzx0ACzEdxKB28wgz9jJInyvof7jw8VBLd
     ACCESS_TOKEN_SECRET: 5VKjpNvuQRubWtwgyDyNqkIFTqrEzLJdUgM3hy1JK05vM
 
-REDIS_SETTINGS:
-    TWITTER_DB: 0
-    TRIPADVISOR_DB: 1
-    SKYSCRAPER_DB: 2
+MONGO:
+    HOST: mongo
+    PORT: 27017
+    DB_NAME: mbsaa
+    TWITTER_COLLECTION: twitter
+    TRIPADVISOR_COLLECTION: tripadvisor
+    SKYSCRAPER_COLLECTION: skyscraper
 
 TWITTER:
     HASHTAGS:
@@ -54,4 +57,4 @@ SKYSCRAPER:
         - new york
         - boston
 CLASSIFIER:
-    MODELS_DIR: '/home/tomek/workspace/mbsaa/res/models'
+    MODELS_DIR: '/opt/mbsaa/res/models'
