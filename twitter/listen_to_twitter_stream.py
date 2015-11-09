@@ -71,7 +71,9 @@ class Aggregator(StreamListener):
         country = None
         continent = None
         if geo:
-            city_name = re.sub(r'^([\w\s]+).+$', '\g<1>', geo)
+            city_name = re.sub(
+                r'^([^\,\.\?\;\:\'\"\[\{\]\}\-\_\!\@\&|*\(\)"]+).+$', '\g<1>',
+                geo)
             cities = self.gazetteer.filter(
                 lambda location: location['name'].downcase().match(
                     city_name)).run()
@@ -79,7 +81,8 @@ class Aggregator(StreamListener):
                 [city for city in cities],
                 key=lambda k: int(k.get('population')))
             if city_results:
-                post_city = city_results[-1]
+                city_obj = city_results[-1]
+                post_city = city_obj.get('asciname')
                 country = city.get('country_code')
                 continent = Country(country).continent.name
             else:

@@ -184,7 +184,9 @@ class TripAdvisorSpider(CrawlSpider):
         country = None
         continent = None
         if item['geo']:
-            city_name = re.sub(r'^([\w\s]+).+$', '\g<1>', item['geo'])
+            city_name = re.sub(
+                r'^([^\,\.\?\;\:\'\"\[\{\]\}\-\_\!\@\&|*\(\)"]+).+$',
+                '\g<1>', item['geo'])
             cities = self.gazetteer.filter(
                 lambda location: location['name'].downcase().match(
                     city_name)).run()
@@ -192,7 +194,8 @@ class TripAdvisorSpider(CrawlSpider):
                 [city for city in cities],
                 key=lambda k: int(k.get('population')))
             if city_results:
-                city = city_results[-1]
+                city_obj = city_results[-1]
+                city = city_obj.get('asciname')
                 country = city.get('country_code')
                 continent = Country(country).continent.name
             else:
